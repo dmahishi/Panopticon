@@ -1,8 +1,8 @@
 classdef BasicDataHandleList < matlab.mixin.Copyable
-%BASICDATAHANDLELIST Basic object to handle experiment data for structs
-%   Basic class to handle generic data backed by a struct and/or arrays of 
-%   structs. Metadata can be attached. Create specific classes for detailed 
-%   analysis.
+%BASICDATAHANDLELIST Basic class to handle experiment data for structs
+%   This class can handle generic data backed by structs and/or arrays of 
+%   structs. Specific metadata can be attached to each object. Create 
+%   specific subclasses for detailed analysis.
 %
 %   Author: Tilman Triphan, tilman.triphan@uni-leipzig.de
 %   License: GNU General Public License v3.0
@@ -24,8 +24,8 @@ classdef BasicDataHandleList < matlab.mixin.Copyable
     properties (SetAccess = protected, GetAccess = protected)
         data; %underlying experiment data
         info; %metadata
-        hash; %hash, should be private, used for fast computations
-        db; %database for metadata
+        hash; %hash, used for (some) fast(er) computations
+        db;   %database (i.e. xlsx table) for metadata
     end
     
     methods        
@@ -59,14 +59,15 @@ classdef BasicDataHandleList < matlab.mixin.Copyable
         end
         
         function saveToFile(obj,filename)
+            % saveToFile(obj,filename) saves the list to disk
             disp('Saving list, please wait...')
-            dhl = obj.copy; %#ok<NASGU>
+            dhl = obj.copy;
             save(filename,'dhl','-v7.3');
-        end        
+        end
         
-        function n = getLength(obj) % should be called getDataLength
+        function n = getLength(obj)
             % n = getLength(obj) returns the size of the wrapped data
-            n = cell2mat(arrayfun(@(o) size(o.data,1),obj(:),'Uniform',0));
+            n = cell2mat(arrayfun(@(o) numel(o.data),obj(:),'Uniform',0));
         end
         
         function s = getDataType(obj)
@@ -77,19 +78,13 @@ classdef BasicDataHandleList < matlab.mixin.Copyable
         
         function dhl = flattenLists(obj)
             % dhl = flattenLists(obj) merges data of 2D list and returns a
-            % new list //BIO //User needs to add metadata
-            dhl = obj(1);
-            dhl.data = (obj.getData2);
-            %merge meta, info
-        end        
-
-        function obj = mergeLists(obj,dhls)
-            %merging lists (should be combineLists)
-            obj.checkForError('differentListTypes',{strcmp(class(obj),class(dhls))});
-            nobj = numel(obj);
-            obj(nobj+1:nobj+numel(dhls)) = dhls;
-            %need to set info, ctrl and meta
-        end        
+            % new list. Metadata needs to be managed by the user
+            merged_data = [];
+            for o=1:numel(obj)
+                merged_data = [merged_data; obj(o).getData]; %#ok<AGROW>
+            end
+            dhl = eval(strcat(class(obj),'(merged_data)')); 
+        end
         
         function v = addFieldAndValues(obj,fieldname,values)
             % v = addFieldAndValues(obj,fieldname,values) adds a new field 
@@ -141,6 +136,10 @@ classdef BasicDataHandleList < matlab.mixin.Copyable
             % the fieldname or the name of the method that will return a list
             % of results.The optional second parameter specifies indices if
             % only a subset of the data should be returned.
+            if numel(obj) > 1
+                warning('This method works only for 1x1 objects')
+                return
+            end
             if nargin == 1
                 fns = fieldnames(obj.data);
                 hist = com.mathworks.mlservices.MLCommandHistoryServices.getSessionHistory;
@@ -201,13 +200,9 @@ classdef BasicDataHandleList < matlab.mixin.Copyable
             dhl = obj(obj.query(varargin{:},'info')).copy;
         end
         
-        function dhl = sLIQ(obj,varargin)
-            % alias for "selectListsByInfoQuery"
-            dhl = obj.selectListsByInfoQuery(varargin{:});
-        end
-        
         function l = query(obj,queryparams,level)
-            % query(obj,queryparams,level) queries the data or the info
+            % l = query(obj,queryparams,level) queries the data or the info
+            % and returns a logial array
             if nargin == 2
                 level = 'data';
             end
@@ -332,7 +327,8 @@ classdef BasicDataHandleList < matlab.mixin.Copyable
         end
 
         function removeDataByIndex(obj,indices)
-            % delete data from underlying struct
+            % removeDataByIndex(obj,indices) deletes data from underlying 
+            % struct. Should be used with care
             obj.checkForError('invalidDataIndex',{indices});
             old_length = obj.getLength;
             obj.data(indices) = [];
@@ -348,20 +344,9 @@ classdef BasicDataHandleList < matlab.mixin.Copyable
             obj.removeDataByIndex(indices);
         end
         
-%         function n = setLength(obj,length)
-%             if nargin == 1
-%                 return
-%             end
-%             n = zeros(numel(obj),1);
-%             for o=1:numel(obj)
-%                 len = min(length,obj(o).getLength);
-%                 obj(o).data = obj(o).getData(1:len);
-%                 n(o) = obj(o).getLength;
-%             end
-%         end
-        
         function sortDataByFieldValue(obj,fieldname,mode)
-            % sort data by field value
+            % sortDataByFieldValue(obj,fieldname,mode) sorts the underlying
+            % data by values for a field
             if nargin == 2
                 mode = 'ascend';
             end            
@@ -372,37 +357,14 @@ classdef BasicDataHandleList < matlab.mixin.Copyable
         end
         
         function dhl = createSubsetByIndex(obj,indices) %#ok<INUSD>
-            % create a subset list (?dhl) from given indices
+            % dhl = createSubsetByIndex(obj,indices) creates a subset list 
+            % from given indices
             dhl = eval(strcat(class(obj),'(obj.data(indices))'));
-            %dhl.copyMetaData(obj); // metadata?
         end
-        
-        function dhl = createSubsetByIndexAndFlatten(obj,indices) %#ok<INUSD>
-            % create multiple subset lists (?dhl) from given indices then
-            % flattens the list. Shorter lists will be dropped!
-            dhls = eval(class(obj));
-            for o=1:numel(obj)
-                try
-                    dhls(o) = eval(strcat(class(obj),'(obj(o).data(indices))'));
-                catch
-                    % handle index exceeds matrix dimensions
-                end
-            end
-            dhl = dhls.flattenLists;
-        end
-        
-        function dhls = combineLists2(obj,dhls_array)
-            dhls = [obj dhls_array];
-        end
-        
-        function dhls = combineLists(obj,varargin)
-            c = cellfun(@class,varargin,'UniformOutput',false);
-            b = all(ismember(c,class(obj)));
-            obj.checkForError('differentListTypes',{b});
-            dhls = [obj varargin];
-        end        
         
         function dhls_array = divideListsByInfoField(obj,infofield)
+            % dhls_array = divideListsByInfoField(obj,infofield) create a 
+            % cell array of lists split by a values for an info field
             vals = obj.getInfo(infofield);
             keys = unique(vals);
             dhls_array = cell(numel(keys),1);
@@ -412,6 +374,7 @@ classdef BasicDataHandleList < matlab.mixin.Copyable
         end
         
         function dhls = selectListsByInfoFieldValue(obj,infofield,value)
+            % create a list selected by a info field value
             vals = obj.getInfo(infofield);
             idx = strcmp(vals,value);
             dhls = obj(idx);
@@ -469,46 +432,6 @@ classdef BasicDataHandleList < matlab.mixin.Copyable
             for i = 1:size(indices,2)
                 dhls(i) = obj.createSubsetByIndex(indices(:,i));
             end
-        end
-        
-        function combineFields2(obj,fn1,fn2,fnout)
-            if nargin == 3
-                fnout = strcat(fn1,fn2);
-            end
-            comVal = strcat(num2str(obj.get(fn1)),'-',num2str(obj.get(fn2)));
-            [obj.data(:).(fnout)] = deal(comVal{:});
-        end
-        
-        function combineFields3(obj,fn1,fn2,fnout)
-            if nargin == 3
-                fnout = strcat(fn1,fn2);
-            end
-            info1 = obj.get(fn1);
-            info2 = obj.get(fn2);
-            if isnumeric(info1{1})
-                info1 = cellfun(@num2str,info1,'un',0);
-            end
-            if isnumeric(info2{1})
-                info2 = cellfun(@num2str,info2,'un',0);
-            end
-            comVal = strcat(info1,'-',info2);
-            [obj.data(:).(fnout)] = deal(comVal{:});
-        end
-        
-        function combineFields(obj,fn1,fn2,fnout)
-            if nargin == 3
-                fnout = strcat(fn1,fn2);
-            end
-            info1 = obj.get(fn1);
-            info2 = obj.get(fn2);
-            if ~iscell(info1)
-                info1 = arrayfun(@num2str,info1,'un',0);
-            end
-            if ~iscell(info2)
-                info2 = arrayfun(@num2str,info2,'un',0);
-            end
-            comVal = strcat(info1,'-',info2);
-            [obj.data(:).(fnout)] = deal(comVal{:});
         end
         
         function mergeInfoFields(obj,infofns,fnout)
@@ -578,7 +501,7 @@ classdef BasicDataHandleList < matlab.mixin.Copyable
             end
         end
         
-        function db = loadDataBase(obj,filename)
+        function db = loadMetaData(obj,filename)
             disp('Loading database, please wait...');
             obj.checkForError('fileNotFound',{filename});
             [~,sheets] = xlsfinfo(filename);
@@ -589,30 +512,7 @@ classdef BasicDataHandleList < matlab.mixin.Copyable
             end
             db = obj.db;
             obj.info.dbpath = filename;
-            obj.applyDataBase;
         end
-        
-        function applyDataBase(obj)
-            % prealloc with NaN
-            cns = fieldnames(obj.db);
-            for c=1:numel(cns)
-                cname = cell2mat(cns(c));
-                if ~isfield(obj.data,cname)
-                    continue
-                end
-                ins = obj.db.(cname)(2:end,1);
-                for i=1:numel(ins)
-                    iname = cell2mat(ins(i));
-                    fns = obj.db.(cname)(1,2:end);
-                    indices = obj.findDataByFieldValue(cname,iname);
-                    for f=1:numel(fns)
-                        fname = cell2mat(fns(f));
-                        b = cell2mat(obj.db.(cname)(i+1,f+1));
-                        [obj.data(indices).(fname)] = deal(b);
-                    end
-                end
-            end
-        end        
         
     end
 
