@@ -59,7 +59,7 @@ classdef PanDataHandleList < BasicDataHandleList
         end
         
         function dhl = sLIQ(obj,varargin)
-            %To sort data acc to specific field names from metadata
+            %To sort data according to specific field names from metadata
             dhl = obj.selectListsByInfoQuery(varargin{:});
         end
         
