@@ -452,12 +452,12 @@ classdef PanDataHandleList < BasicDataHandleList
             for o=1:numel(obj)
                 [~,idx] = maxk(obj(o).distance,nFrames);
                 for i=1:numel(idx)
-                    h(i) = obj.showImageForFrame(idx(i)-1:idx(i)+1); %#ok<AGROW>
+                    h(i) = obj.plotTracksOnImage(idx(i)-1:idx(i)+1); %#ok<AGROW>
                 end
             end
         end
         
-        function h = showImageForFrame(obj,idx)
+        function h = plotTracksOnImage(obj,idx)
             % load and show image corresponding to frame
             % Sanity check function, only a single folder will be looked at
             path = cell2mat(obj(1).getInfo('ImagePath'));
