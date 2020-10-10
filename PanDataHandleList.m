@@ -803,12 +803,20 @@ classdef PanDataHandleList < BasicDataHandleList
                 dn = diff(ln);
                 gs = find(dn == 1)+1; %gap start
                 ge = find(dn == -1)+1; %gap end
+                if (numel(gs) > numel(ge))
+                    ge(numel(gs)) = numel(ln);
+                end
+                
                 gl = ge - gs; %gap length
                 gp = gs(gl == 1); %check if +/-1 out of border
-                x = num2cell(mean([obj(o).get('x',gp-1) obj(o).get('x',gp+1)],2));
-                y = num2cell(mean([obj(o).get('y',gp-1) obj(o).get('y',gp+1)],2));
-                [obj(o).data(gp).x] = deal(x{:});
-                [obj(o).data(gp).y] = deal(y{:});
+                dx = [obj(o).get('x',gp-1) obj(o).get('x',gp+1)];
+                dy = [obj(o).get('y',gp-1) obj(o).get('y',gp+1)];
+                if ~isempty(dx)
+                    x = num2cell(mean(dx,2));
+                    y = num2cell(mean(dy,2));
+                    [obj(o).data(gp).x] = deal(x{:});
+                    [obj(o).data(gp).y] = deal(y{:});
+                end
                 obj(o).info.fixGaps = 1;
             end            
         end
