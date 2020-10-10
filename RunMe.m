@@ -29,6 +29,8 @@ pano = PanDataHandleList.CreateFromFolder(datapath);
 pano.assignSector
 % original data is split into different sectors 
 pFixed = pano.splitAndRepair('Sector',batchsize);
+% NaNs are handled more efficiently
+pFixed.fixGaps
 % metadata is added
 pFixed.addDataPath(datapath)
 pFixed.addImagePath;
