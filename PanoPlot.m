@@ -83,6 +83,7 @@ switch (params.defaultPlot)
         p.addParameter('subPlotRange',[],@(x) isnumeric(x) && all(x > 0));
         p.addParameter('legendLabel','Starvation',isInfoField);
         p.addParameter('plotParams',[],@(x) iscell(x));
+        p.addParameter('saveDataAs','',@(x) ischar(x)); % works only for single datasets        
     case 'PatchActivity'
         p.addParameter('toPlot','onArea',isPlotFunc);
         p.addParameter('plotType','shadedErrorBar',isPlotType);
@@ -94,6 +95,7 @@ switch (params.defaultPlot)
         p.addParameter('subPlotRange',[],@(x) isnumeric(x) && all(x > 0));
         p.addParameter('legendLabel','Starvation',isInfoField);
         p.addParameter('plotParams',{2},@(x) iscell(x));
+        p.addParameter('saveDataAs','',@(x) ischar(x)); % works only for single datasets 
     case 'ActivityGroups'
         p.addParameter('toPlot','isActiveStackedMM',isPlotFunc);
         p.addParameter('plotType','stackedBars',isPlotType);
@@ -108,16 +110,19 @@ switch (params.defaultPlot)
         p.addParameter('toPlot','isActive',isPlotFunc);
         p.addParameter('plotType','boxPlots',isPlotType);
         p.addParameter('indices',':',@(x) isnumeric(x) || islogical(x));
+        p.addParameter('timeWindow',[],@(x) isnumeric(x) && all(x >= 0) && (numel(x) == 2)); %[8.25 12.25] for 8:15 to 12:15        
         p.addParameter('binCount',10,@(x) isnumeric(x) && (x > 0));
         p.addParameter('binWidth',10,@(x) isnumeric(x) && (x > 0));
         p.addParameter('binMethod','log2',isBinMethod);
         p.addParameter('includeHighValues',true,@(x) islogical(x));
         p.addParameter('keepMinimum',2,@(x) isnumeric(x) && (x > 0));
         p.addParameter('plotParams',{1},@(x) iscell(x));
+        p.addParameter('saveDataAs','',@(x) ischar(x)); % works only for single datasets 
     case 'StopDistributionMulti'
         p.addParameter('toPlot','isActive',isPlotFunc);
         p.addParameter('plotType','boxPlots',isPlotType);
         p.addParameter('indices',':',@(x) isnumeric(x) || islogical(x));
+        p.addParameter('timeWindow',[],@(x) isnumeric(x) && all(x >= 0) && (numel(x) == 2)); %[8.25 12.25] for 8:15 to 12:15        
         p.addParameter('binCount',10,@(x) isnumeric(x) && (x > 0));
         p.addParameter('binWidth',10,@(x) isnumeric(x) && (x > 0));
         p.addParameter('binMethod','log2',isBinMethod);
@@ -129,18 +134,17 @@ switch (params.defaultPlot)
         p.addParameter('toPlot','distance',isPlotFunc);                     % data to plot (wrong!)
         p.addParameter('plotType','histogram',isPlotType);                  % type of plot
         p.addParameter('indices',':',@(x) isnumeric(x) || islogical(x));    % range of data to plot
-        p.addParameter('timeWindow',[],@(x) isnumeric(x) && all(x >= 0) && (numel(x) == 2)); %8.25:12.25 for 8:15 to 12:15
-        p.addParameter('binCount',200,@(x) isnumeric(x) && (x > 0));        %
-        p.addParameter('binWidth',0.02,@(x) isnumeric(x) && (x > 0));       %
+        p.addParameter('timeWindow',[],@(x) isnumeric(x) && all(x >= 0) && (numel(x) == 2)); %[8.25 12.25] for 8:15 to 12:15
+        p.addParameter('binCount',75,@(x) isnumeric(x) && (x > 0));        %
+        p.addParameter('binWidth',0.4,@(x) isnumeric(x) && (x > 0));       %
         p.addParameter('binMethod','auto',isBinMethod);                     %
-        p.addParameter('binLimits',[0 2],@(x) isnumeric(x) && all(x >= 0) && (numel(x) == 2));
-        p.addParameter('keepMinimum',0.1,@(x) isnumeric(x) && (x >= 0));    %
+        p.addParameter('binLimits',[0 15],@(x) isnumeric(x) && all(x >= 0) && (numel(x) == 2));
+        p.addParameter('keepMinimum',0.2,@(x) isnumeric(x) && (x >= 0));    %
         p.addParameter('normalization','probability',@(x) ischar(x));       % check Matlab histogram function for valid normalization schemes
-        %p.addParameter('subPlotRange',[],@(x) isnumeric(x) && all(x > 0));  % no!
         p.addParameter('filterFunction',[],@(x) ischar(x));                 %
-        p.addParameter('filterParams',{2},@(x) iscell(x));                  %
+        p.addParameter('filterParams',{1},@(x) iscell(x));                  %
         p.addParameter('legendLabel','Starvation',isInfoField);
-        p.addParameter('plotParams',{2},@(x) iscell(x));
+        p.addParameter('plotParams',{1},@(x) iscell(x));
     otherwise
         p.addParameter('toPlot','',isPlotFunc);
         p.addParameter('plotType','',isPlotType);
@@ -158,7 +162,6 @@ switch (params.defaultPlot)
 end
 
 p.addParameter('fontSize',25,@(x) isnumeric(x) && (x > 0));
-p.addParameter('saveDataAs','',@(x) ischar(x));
 p.addParameter('colorList',defaultColors,@(x) isnumeric(x));
 
 p.parse(paramin{:});
@@ -225,20 +228,32 @@ if strcmp(params.defaultPlot,'StopDistributionMulti')
         obj = objlist{a};
         bin = zeros(numel(obj),params.binCount);
         for o=1:numel(obj)
+            %if time indices, calculate here            
+            if ~isempty(params.timeWindow)
+                tws = obj(o).timeToFrame(params.timeWindow(1));
+                twe = obj(o).timeToFrame(params.timeWindow(2));
+                params.indices = tws:twe;
+            end
             [posEventStarts, durEvents] = obj(o).calculateStops(params.indices);
-
-            lOnArea = obj(o).onArea(params.plotParams{1},posEventStarts);
-            durEvents = durEvents(lOnArea);
+            if posEventStarts > 0
+                onArea = obj(o).onArea(params.plotParams{1},params.indices);
+                stopOnAreaStatus = onArea(posEventStarts);
+                durEventsOnArea = durEvents(stopOnAreaStatus);
+                durEvents = durEventsOnArea;
+            else
+                durEvents = [];
+            end
             
             idx = durEvents < params.keepMinimum;
             durEvents(idx) = [];
+            
             if ~isempty(durEvents)
                 durEvents(length(durEvents)) = [];
             end
             for i=1:params.binCount
                 switch (params.binMethod)
                     case 'log2'
-                        bin(o,i) = sum((durEvents >= 2^i) & (durEvents < 2^(i+1)-1));
+                        bin(o,i) = sum((durEvents >= 2^i) & (durEvents <= 2^(i+1)-1));
                         if (i == params.binCount) && params.includeHighValues
                             bin(o,i) = sum(durEvents >= 2^i);
                         end
@@ -254,6 +269,15 @@ if strcmp(params.defaultPlot,'StopDistributionMulti')
         dev = nanstd(bin);
         SEM(:,a) = dev/sqrt(numel(bin));
         legendstr(a) = objlist{a}(1).getInfo('Starvation');
+    end
+    
+    if ~isempty(params.saveDataAs)
+        %Saves data along with exp ID labels
+        cBinVals = arrayfun(@(x) x, bin, 'UniformOutput', false);
+        xlsdata = cell(numel(obj), params.binCount+1);
+        xlsdata(:,1) = obj.getInfo('SectorID');
+        xlsdata(:,2:end) = cBinVals;
+        xlswrite(params.saveDataAs,xlsdata);
     end
     
     bar(meanVals);
@@ -274,7 +298,7 @@ if strcmp(params.defaultPlot,'StopDistributionMulti')
             xlabel(['Stop duration(',num2str(params.binWidth),'s/bin)'],...
                 'FontSize',params.fontSize,'FontWeight','bold');
     end
-    ylabel('Number of Stop Events','FontSize',params.fontSize,'FontWeight','bold')
+    ylabel('Avg number of stop events','FontSize',params.fontSize,'FontWeight','bold')
     legend(legendstr);
     return
 end
