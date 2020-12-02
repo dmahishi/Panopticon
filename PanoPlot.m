@@ -131,18 +131,18 @@ switch (params.defaultPlot)
         p.addParameter('legendLabel','Starvation',isInfoField);
         p.addParameter('plotParams',{1},@(x) iscell(x));
     case 'MovementDistribution' 
-        p.addParameter('toPlot','distance',isPlotFunc);                     % data to plot (wrong!)
+        p.addParameter('toPlot','distance',isPlotFunc);
         p.addParameter('plotType','histogram',isPlotType);                  % type of plot
         p.addParameter('indices',':',@(x) isnumeric(x) || islogical(x));    % range of data to plot
         p.addParameter('timeWindow',[],@(x) isnumeric(x) && all(x >= 0) && (numel(x) == 2)); %[8.25 12.25] for 8:15 to 12:15
-        p.addParameter('binCount',75,@(x) isnumeric(x) && (x > 0));        %
-        p.addParameter('binWidth',0.4,@(x) isnumeric(x) && (x > 0));       %
-        p.addParameter('binMethod','auto',isBinMethod);                     %
+        p.addParameter('binCount',75,@(x) isnumeric(x) && (x > 0));        % total number of bins 
+        p.addParameter('binWidth',0.4,@(x) isnumeric(x) && (x > 0));        
+        p.addParameter('binMethod','auto',isBinMethod);                     
         p.addParameter('binLimits',[0 15],@(x) isnumeric(x) && all(x >= 0) && (numel(x) == 2));
         p.addParameter('keepMinimum',0.2,@(x) isnumeric(x) && (x >= 0));    %
         p.addParameter('normalization','probability',@(x) ischar(x));       % check Matlab histogram function for valid normalization schemes
-        p.addParameter('filterFunction',[],@(x) ischar(x));                 %
-        p.addParameter('filterParams',{1},@(x) iscell(x));                  %
+        p.addParameter('filterFunction',[],@(x) ischar(x));                 % movement distribution on food patch ('filterFunction', 'onArea')
+        p.addParameter('filterParams',{1},@(x) iscell(x));                  % movement distribution on food patch ('filterParams', {2})
         p.addParameter('legendLabel','Starvation',isInfoField);
         p.addParameter('plotParams',{1},@(x) iscell(x));
     otherwise
